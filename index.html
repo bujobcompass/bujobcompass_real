@@ -3370,6 +3370,13 @@ window.addEventListener('load', ()=>{
   const restored = restoreFromLink();
   if(!restored) showResumeBannerIfAny(); // 공유 링크로 들어온 게 아니면, 저장된 진행이 있는지 확인
 });
+
+/* 이미 열려있는 탭에서 주소창 끝부분(#r=...&u=1)만 바꿔 다시 들어오는 경우 대비.
+   브라우저에 따라 해시만 바뀌면 'load'가 다시 안 터지는 경우가 있어서, hashchange도 별도로 감지함.
+   (결제 확인 후 &u=1 붙여서 재접속하는 흐름이 바로 이 경우라 꼭 필요함) */
+window.addEventListener('hashchange', ()=>{
+  restoreFromLink();
+});
 </script>
 </body>
 </html>
