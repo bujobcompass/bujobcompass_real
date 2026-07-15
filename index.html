@@ -472,6 +472,12 @@
   .placeholder-week .wc-lock{color:var(--brass-soft);}
   .wc-placeholder-text{font-size:13px; line-height:1.7; color:var(--ink); margin:0 0 10px;}
   .wc-placeholder-note{font-size:11.5px; line-height:1.6; color:var(--ink-dim); margin:0; padding-top:10px; border-top:1px dashed var(--line);}
+  .wc-generate-btn{width:100%; margin-top:10px; padding:11px; border-radius:10px; border:none; background:var(--brass); color:#1a1510; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;}
+  .wc-generate-btn:disabled{opacity:0.6; cursor:default;}
+  .wc-result{margin-top:10px;}
+  .wc-days{margin:0; padding-left:18px;}
+  .wc-days li{font-size:13px; line-height:1.75; color:var(--ink); margin-bottom:6px;}
+  .ai-error{padding:10px 12px; background:rgba(214,120,90,0.1); border-radius:8px; font-size:12.5px; color:#e08a68;}
   .wk-day{padding:12px 0; border-bottom:1px solid var(--line);}
   .wk-day:last-child{border-bottom:none;}
   .wk-day.locked{opacity:0.45;}
@@ -2953,7 +2959,7 @@ function itemHTML(it, selectable, idx, dynCtx){
    restoreFromLink()가 u=1을 감지해서 2~4주차를 자동으로 열어줌 (백엔드 없이 동작).
    ⚠️ TODO(세인님 직접 수정): 아래 KAKAO_PAY_LINK를 본인 카카오페이 "송금 요청" 또는 QR 링크로 교체하세요.
    ⚠️ 정기적으로 판매한다면 전자상거래법상 통신판매업 신고 대상일 수 있으니 확인해보시는 걸 권장해요. */
-const KAKAO_PAY_LINK = 'https://qr.kakaopay.com/여기에_본인_송금_링크로_교체';
+const KAKAO_PAY_LINK = 'https://qr.kakaopay.com/Fd4ExgdqN';
 
 /* 첫 100명 4,900원 프로모션.
    ⚠️ TODO(세인님 직접 관리): 지금은 결제도 카카오페이 수동 확인 방식이라, 100명이 채워졌는지도
@@ -3063,39 +3069,99 @@ const weekThemesByArchetype = {
 };
 function renderWeekPlaceholder(w, itemTitle, isContentType){
   const themes = isContentType ? weekThemesByArchetype.content : weekThemesByArchetype.job;
-  return `<div class="week-card placeholder-week">
+  return `<div class="week-card placeholder-week" id="weekCard${w}">
     <div class="week-card-head">
       <span class="wc-no">WEEK ${w}</span>
       <span class="wc-theme">${themes[w]}</span>
-      <span class="wc-lock">⚙️ AI 생성 자리</span>
     </div>
     <div class="wc-body">
-      <p class="wc-placeholder-text">"${itemTitle}"에서 1주차 동안 쌓은 성과·고민을 바탕으로, AI가 여기서 ${w}주차 플랜을 그 사람 맞춤으로 만들어줘.</p>
-      <p class="wc-placeholder-note">🔧 지금은 프로토타입이라 자리만 비워뒀어. 실제 서비스에서는 Claude API 호출로 이 자리를 실시간으로 채우면 돼.</p>
+      <p class="wc-placeholder-text">"${itemTitle}"에서 지금까지 쌓은 성과·고민을 바탕으로, 이번 주 플랜을 짜줄게.</p>
+      <button class="wc-generate-btn" onclick="generateWeekPlan(${w}, this)">🪄 ${w}주차 플랜 만들기</button>
+      <div class="wc-result"></div>
     </div>
   </div>`;
 }
 
-/* 결제 후 AI 소재 생성 (데모: 규칙 샘플. 실제로는 Claude API 호출)
-   ※ 사업화 시: 이 함수를 Claude API 호출로 교체.
-      프롬프트에 [직업/나이/상황 + 관심사 + 자유입력]을 넣으면
-      진짜 그 사람만을 위한 소재가 생성됨. 결제자만 실행 → 비용 안전. */
+/* 2~4주차 실제 AI 생성 — 버튼을 눌렀을 때만 호출해서(자동 실행 아님) 불필요한 API 비용을 막음.
+   이 버튼도 renderPaidContent() 안에서만 나오기 때문에 결제 확인된 사람한테만 노출됨. */
+function generateWeekPlan(w, btn){
+  const card = btn.closest('.week-card');
+  const resultBox = card.querySelector('.wc-result');
+  const itemTitle = (pickedJobIdx!==null && chosenJobs[pickedJobIdx]) ? chosenJobs[pickedJobIdx].title : '';
+  const typeName = lastResult ? lastResult.typeName : '';
+  const isContentType = CONTENT_ORIENTED_TYPES.includes(typeName);
+  const themes = isContentType ? weekThemesByArchetype.content : weekThemesByArchetype.job;
+  const jobCat = lastResult ? lastResult.jobCat : null;
+  const jobName = (lastResult&&lastResult.jobText)?lastResult.jobText:'너';
+
+  btn.disabled = true;
+  btn.textContent = '생성 중...';
+  resultBox.innerHTML = '<div class="ai-loading"><span class="spinner-s"></span> AI가 이번 주 플랜을 짜는 중...</div>';
+
+  const prompt = `역할: 부업 코치야. "${itemTitle}"라는 부업을 시작한 사람을 4주째 코칭하고 있어.`
+    + `\n맥락: 이 사람은 ${jobName}(으)로 지내고 있고${jobCat?`, ${jobCat.name} 쪽 배경이 있어`:''}. 이번 주(${w}주차) 목표는 "${themes[w]}"야.`
+    + `\n요청: 이번 주에 매일 할 일을 Day1~Day7로 나눠서 구체적으로 짜줘. 1주차와 겹치지 않게, 한 단계 더 나아간 내용으로.`
+    + `\n형식: "Day1: ~~" 처럼 7줄로, 각 줄은 1~2문장. 서두나 마무리 인사말 없이 Day1부터 바로 시작해줘.`;
+
+  fetch('/api/ask', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ prompt, maxTokens: 900 }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if(data.error){
+        resultBox.innerHTML = `<div class="ai-error">⚠️ ${data.error}</div>`;
+        btn.disabled = false; btn.textContent = `🪄 ${w}주차 플랜 만들기`;
+        return;
+      }
+      // 모델이 텍스트(줄바꿈 기반)로 답하니, HTML로 안전하게 이스케이프 후 줄 단위로 렌더
+      const esc = (s)=> s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const lines = data.text.split('\n').map(l=>l.trim()).filter(l=>l);
+      resultBox.innerHTML = `<ul class="wc-days">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`;
+      btn.remove();
+    })
+    .catch(()=>{
+      resultBox.innerHTML = '<div class="ai-error">⚠️ 연결에 실패했어. 잠시 후 다시 시도해줘</div>';
+      btn.disabled = false; btn.textContent = `🪄 ${w}주차 플랜 만들기`;
+    });
+}
+
+/* 결제 후 AI 소재 생성 — 실제 Claude API 호출로 연결됨.
+   이 함수는 renderPaidContent() 안에서만 렌더링되고, renderPaidContent는 카카오페이 수동 결제
+   확인 후(u=1 언락 링크) 열리는 화면에서만 호출되기 때문에, 결제 안 한 사람은 이 버튼 자체를
+   볼 수 없어서 API 비용이 새어나갈 위험이 없음. */
 function generateAiIdeas(){
   const detail = document.getElementById('aiInterestDetail').value.trim();
   if(!detail){ showToast('간단히 적어줘 — 그걸로 소재를 짜줄게'); return; }
   const box = document.getElementById('aiIdeaResult');
   box.innerHTML = '<div class="ai-loading"><span class="spinner-s"></span> AI가 네 이야기로 소재 짜는 중...</div>';
-  // 데모: 실제 API 대신 샘플 소재 생성
-  setTimeout(()=>{
-    const jobName = (lastResult&&lastResult.jobText)?lastResult.jobText:'너';
-    const ideas = demoAiIdeas(pickedInterest, detail, jobName);
-    box.innerHTML = `<div class="ai-ideas">
-      <div class="ai-ideas-head">💡 "${detail}" — 이런 소재 어때?</div>
-      ${ideas.map((v,i)=>`<div class="ai-idea"><span class="ai-idea-no">${i+1}</span><p>${v}</p></div>`).join('')}
-      <p class="ai-ideas-foot">마음에 드는 걸로 2주차를 시작해봐. (실제 서비스에선 AI가 매번 새로 생성)</p>
-    </div>`;
-    box.scrollIntoView({behavior:'smooth', block:'center'});
-  }, 1200);
+
+  const jobName = (lastResult&&lastResult.jobText)?lastResult.jobText:'너';
+  const prompt = `역할: {ITEM} 콘텐츠 기획 코치야.`.replace('{ITEM}', pickedInterest||'')
+    + `\n맥락: ${jobName}(으)로 지내는 사람이 "${pickedInterest}" 주제로 콘텐츠를 만들고 있고, 이렇게 하고 싶어해: "${detail}"`
+    + `\n요청: 이 사람만의 이야기를 살린 구체적인 콘텐츠 소재 3개를 제안해줘. 각 소재는 왜 이 사람한테 맞는지 한 줄 이유도 같이.`
+    + `\n형식: 소재 3개, 각 1~2문장. 번호만 매기고 다른 설명 없이 소재 내용만 답해줘.`;
+
+  fetch('/api/ask', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ prompt, maxTokens: 500 }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if(data.error){ box.innerHTML = `<div class="ai-error">⚠️ ${data.error}</div>`; return; }
+      const lines = data.text.split('\n').map(l=>l.replace(/^\d+[.)]\s*/,'').trim()).filter(l=>l);
+      box.innerHTML = `<div class="ai-ideas">
+        <div class="ai-ideas-head">💡 "${detail}" — 이런 소재 어때?</div>
+        ${lines.map((v,i)=>`<div class="ai-idea"><span class="ai-idea-no">${i+1}</span><p>${v}</p></div>`).join('')}
+        <p class="ai-ideas-foot">마음에 드는 걸로 2주차를 시작해봐.</p>
+      </div>`;
+      box.scrollIntoView({behavior:'smooth', block:'center'});
+    })
+    .catch(()=>{
+      box.innerHTML = '<div class="ai-error">⚠️ 연결에 실패했어. 잠시 후 다시 시도해줘</div>';
+    });
 }
 
 /* 데모용 샘플 소재 (실제로는 AI가 생성) */
