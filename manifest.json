@@ -1,0 +1,32 @@
+{
+  "name": "부업 나침반 — 본업 해치지 않는 진짜 부업",
+  "short_name": "부업 나침반",
+  "description": "15개 질문으로 나한테 맞는 부업을 찾고, 7일 실행법까지 짜주는 서비스",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1a18",
+  "theme_color": "#0d1a18",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
