@@ -3108,15 +3108,20 @@ function generateWeekPlan(w, btn){
   btn.textContent = '생성 중...';
   resultBox.innerHTML = '<div class="ai-loading"><span class="spinner-s"></span> AI가 이번 주 플랜을 짜는 중...</div>';
 
-  const prompt = `역할: 부업 코치야. "${itemTitle}"라는 부업을 시작한 사람을 4주째 코칭하고 있어.`
-    + `\n맥락: 이 사람은 ${jobName}(으)로 지내고 있고${jobCat?`, ${jobCat.name} 쪽 배경이 있어`:''}. 이번 주(${w}주차) 목표는 "${themes[w]}"야.`
-    + `\n요청: 이번 주에 매일 할 일을 Day1~Day7로 나눠서 구체적으로 짜줘. 1주차와 겹치지 않게, 한 단계 더 나아간 내용으로.`
-    + `\n형식: "Day1: ~~" 처럼 7줄로, 각 줄은 1~2문장. 서두나 마무리 인사말 없이 Day1부터 바로 시작해줘.`;
+  const prompt = `역할: 너는 "${itemTitle}" 분야에서 실제로 부업을 여러 번 성공시켜본 베테랑 코치야. 뜬구름 잡는 동기부여 대신 구체적인 도구·사이트 이름, 숫자, 실제 예시를 항상 넣어서 말하는 스타일이야.`
+    + `\n맥락: 이 사람은 ${jobName}(으)로 지내고 있고${jobCat?`, ${jobCat.name} 쪽 배경이 있어`:''}. 지금은 "${itemTitle}" 부업 ${w}주차이고, 이번 주 목표는 "${themes[w]}"야. 1주차는 이미 기초를 다졌으니 절대 겹치지 않게, 한 단계 더 나아간 내용으로 짜줘.`
+    + `\n요청: 이번 주 Day1~Day7을 하루하루 아주 구체적으로 짜줘. 각 Day는 대략 900~1100자 분량으로, 아래 4가지를 자연스럽게 녹여서 써:`
+    + `\n1) 오늘 정확히 뭘 해야 하는지 — 실제 도구/사이트/앱 이름과 숫자·목표치를 반드시 포함`
+    + `\n2) 왜 이 순서로 해야 하는지 — 실전에서 이렇게 해야 하는 이유`
+    + `\n3) 이 단계에서 흔히 막히는 지점과 실제 해결법`
+    + `\n4) 오늘이 끝났을 때 눈으로 확인할 수 있는 구체적인 결과물`
+    + `\n말투: 그 분야 진짜 고수가 후배한테 정성껏 알려주듯. 뻔한 조언 말고 실전에서만 나올 수 있는 디테일 위주로.`
+    + `\n형식: "Day1: [본문]" 형태로 한 줄에 하나씩 총 7줄. 각 줄 안에서는 줄바꿈 넣지 말고 이어서 써. 서두나 마무리 인사말 없이 Day1부터 바로 시작해줘.`;
 
   fetch('/api/ask', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ prompt, maxTokens: 900 }),
+    body: JSON.stringify({ prompt, maxTokens: 4000 }),
   })
     .then(r => r.json())
     .then(data => {
@@ -3148,15 +3153,15 @@ function generateAiIdeas(){
   box.innerHTML = '<div class="ai-loading"><span class="spinner-s"></span> AI가 네 이야기로 소재 짜는 중...</div>';
 
   const jobName = (lastResult&&lastResult.jobText)?lastResult.jobText:'너';
-  const prompt = `역할: {ITEM} 콘텐츠 기획 코치야.`.replace('{ITEM}', pickedInterest||'')
+  const prompt = `역할: 너는 "${pickedInterest}" 분야에서 오래 활동해온 콘텐츠 기획 고수야. 이 사람이 남긴 이야기를 대충 넘기지 않고, 그 안에서 진짜 소재가 될 만한 디테일을 정확히 짚어내는 스타일이야.`
     + `\n맥락: ${jobName}(으)로 지내는 사람이 "${pickedInterest}" 주제로 콘텐츠를 만들고 있고, 이렇게 하고 싶어해: "${detail}"`
-    + `\n요청: 이 사람만의 이야기를 살린 구체적인 콘텐츠 소재 3개를 제안해줘. 각 소재는 왜 이 사람한테 맞는지 한 줄 이유도 같이.`
-    + `\n형식: 소재 3개, 각 1~2문장. 번호만 매기고 다른 설명 없이 소재 내용만 답해줘.`;
+    + `\n요청: 이 사람이 남긴 말을 정성껏 읽고, 이 사람만의 이야기를 살린 구체적인 콘텐츠 소재 3개를 제안해줘. 각 소재는 2~3문장으로: 무슨 내용인지 구체적으로, 왜 이 사람한테 특히 잘 맞는지(남긴 말의 어떤 부분에서 나온 아이디어인지), 실제로 어떻게 시작하면 되는지까지 담아줘.`
+    + `\n형식: 소재 3개, 각 2~3문장. 번호만 매기고 다른 설명 없이 소재 내용만 답해줘.`;
 
   fetch('/api/ask', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ prompt, maxTokens: 500 }),
+    body: JSON.stringify({ prompt, maxTokens: 900 }),
   })
     .then(r => r.json())
     .then(data => {
@@ -3311,7 +3316,7 @@ function restoreFromLink(){
     renderRestored(typeName, data, ti);
     // 결제 확인 후 세인님이 링크 뒤에 &u=1 을 붙여 회신하면, 여기서 2~4주차를 바로 열어줌 (백엔드 없이)
     const kIdx = p.get('k'); if(kIdx!==null) pickedJobIdx = parseInt(kIdx);
-    if(p.get('u')==='1'){ goStep('week1'); showUnlockedPaidContent(); }
+    if(p.get('u')==='1'){ goStep('week1'); showUnlockedPaidContent(); maybeShowPushBanner(); }
     return true;
   }catch(e){ return false; }
 }
