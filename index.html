@@ -100,7 +100,8 @@
   .blocker-why{font-size:12px; line-height:1.6; color:var(--ink-dim); margin:0 0 12px;}
   .blocker-why strong{color:var(--brass-soft);}
   .blocker-btn.blocker-skip{border-style:dashed; color:var(--ink-dim); font-size:12.5px;}
-  .rest-toggle{width:100%; padding:11px; border-radius:10px; border:1px dashed var(--line); background:transparent; color:var(--ink-dim); font-size:12.5px; cursor:pointer; font-family:inherit;}
+  .rest-toggle{width:100%; padding:14px; border-radius:10px; border:1px solid var(--brass); background:rgba(204,154,92,0.08); color:var(--brass-soft); font-size:14.5px; font-weight:700; cursor:pointer; font-family:inherit;}
+  .rest-toggle:active{transform:scale(0.99);}
   .rest-toggle:hover{border-color:var(--sage); color:var(--sage);}
 
   /* 결과 페이지 고정 하단 바 — 유형만 보고 이탈하는 것 방지 */
@@ -116,6 +117,16 @@
 
   /* 동적 개인화 한 줄 (예산·시간·직업군 조합) */
   .dyn-note{font-size:12.5px; line-height:1.65; color:var(--brass-soft); background:rgba(204,154,92,0.07); border-radius:8px; padding:8px 11px; margin:8px 0;}
+  /* 카드마다 반복되던 개인화 문구를 화면 상단에 한 번만 노출하는 버전 */
+  .dyn-note-shared{font-size:12.5px; line-height:1.65; color:var(--brass-soft); background:rgba(204,154,92,0.07); border:1px solid rgba(204,154,92,0.2); border-radius:9px; padding:10px 12px; margin:10px 0 0;}
+  .dyn-note-shared.hidden{display:none;}
+  /* 카드 상세(단계·팁·인사이트 등)는 접어두고, 고를 때 필요한 것만 노출 */
+  .item-details{margin-top:4px;}
+  .item-details[open] .item-details-toggle{color:var(--brass-soft);}
+  .item-details-toggle{list-style:none; cursor:pointer; font-size:12.5px; color:var(--ink-dim); padding:9px 0; user-select:none;}
+  .item-details-toggle::-webkit-details-marker{display:none;}
+  .item-details-toggle::after{content:' ▾'; font-size:10px;}
+  .item-details[open] .item-details-toggle::after{content:' ▴';}
 
   /* 나이대별 실행 가이드 (콘텐츠형·창작형) */
   .age-guide-box{background:rgba(143,174,156,0.08); border-radius:8px; padding:9px 11px; margin:8px 0;}
@@ -171,7 +182,7 @@
   .badge-common{background:rgba(143,174,156,0.2); color:var(--sage);}
   .badge-unique{background:rgba(224,184,120,0.2); color:var(--brass-soft);}
   .badge-simple{background:rgba(169,190,182,0.15); color:var(--ink-dim);}
-  .item-title{font-size:15px; font-weight:700; color:var(--ink); line-height:1.4;}
+  .item-title{font-size:18.5px; font-weight:700; color:var(--ink); line-height:1.35; letter-spacing:-0.01em;}
   .item-body{font-size:13.5px; line-height:1.75; color:var(--ink-dim); margin-bottom:10px;}
   .item-body strong{color:var(--brass-soft); font-weight:600;}
   .step-list{margin:0 0 10px; padding:0; list-style:none;}
@@ -734,6 +745,9 @@ function trackEvent(name, params){
     <div class="card" style="padding-bottom:8px;">
       <p class="section-label">02 · 지금 너한테 맞는 부업 3가지</p>
       <p style="font-size:12.5px; color:var(--ink-dim); margin:0; line-height:1.6;">아래 3개 중 <strong style="color:var(--brass-soft)">이번에 진짜 시작해볼 것 하나</strong>를 골라봐. 고른 것에 맞춰 1주차 플랜을 짜줄게.</p>
+      <!-- 예산·시간·직업군 개인화 문구: 예전엔 카드마다 똑같이 반복됐는데(카드 구별에 도움 0, 읽기 부담만 큼)
+           여기 한 번만 보여주도록 옮김 -->
+      <div id="jobsDynNote" class="dyn-note-shared hidden"></div>
     </div>
     <div id="lockedContent"></div>
 
@@ -1319,7 +1333,9 @@ setInterval(()=>{ idle+=0.1; const n=document.getElementById('needle'); if(n) n.
 function renderCard(i){
   const q = questions[i];
   const container = document.getElementById('quizCards');
-  let html = `<div class="card qcard" id="qcard">
+  // 첫 문항이 아니면 이전 버튼 노출 — 잘못 눌렀을 때 처음부터 다시 하게 만들면 이탈로 이어짐
+  const backBtn = i>0 ? `<button class="btn-back" onclick="goPrev()" style="margin-bottom:10px;">← 이전</button>` : '';
+  let html = `${backBtn}<div class="card qcard" id="qcard">
     <div class="qnum mono">Q${i+1} / ${TOTAL_Q}</div>
     <p class="qtext">${q.q}</p>`;
   if(q.hint) html += `<p class="qhint">${q.hint}</p>`;
@@ -1328,7 +1344,8 @@ function renderCard(i){
       <button class="btn-next" id="qNext" disabled>다음</button>`;
   } else {
     html += `<div class="opts">`;
-    q.opts.forEach((o,idx)=>{ html += `<button class="opt" data-idx="${idx}">${o}</button>`; });
+    // 이전으로 돌아왔을 때 아까 고른 답이 그대로 표시되게 picked 복원
+    q.opts.forEach((o,idx)=>{ html += `<button class="opt${answers[i]===idx?' picked':''}" data-idx="${idx}">${o}</button>`; });
     html += `</div>`;
   }
   html += `</div>`;
@@ -1360,6 +1377,14 @@ function goNext(){
   curCard++;
   if(curCard < TOTAL_Q){ renderCard(curCard); window.scrollTo({top:0,behavior:'smooth'}); }
   else { runAnalysis(); }
+}
+
+function goPrev(){
+  if(curCard <= 0) return;
+  document.getElementById('p'+curCard)?.classList.remove('done'); // 아직 안 푼 상태로 되돌림
+  curCard--;
+  renderCard(curCard);
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 /* 분석 로딩 연출 후 결과 표시 */
@@ -1524,6 +1549,17 @@ function computeResult(){
   restJobs = rest; // "다른 부업들" 탭 선택용 전역 저장
   const dynCtx = { jobCat, budgetIdx, timePref, typeName, ageIdx };
   document.getElementById('legalNoteWrap').innerHTML = legalNoteHTML(typeName);
+
+  // 개인화 문구는 3개 카드에 다 똑같이 들어가던 내용이라, 목록 위에 한 번만 보여줌
+  const sharedDynEl = document.getElementById('jobsDynNote');
+  const sharedDynText = dynamicNote(null, jobCat, budgetIdx, timePref);
+  if(sharedDynText){
+    sharedDynEl.innerHTML = `🎯 ${sharedDynText}`;
+    sharedDynEl.classList.remove('hidden');
+  } else {
+    sharedDynEl.classList.add('hidden');
+  }
+
   document.getElementById('lockedContent').innerHTML = chosen.map((it,i)=>itemHTML(it, true, i, dynCtx)).join('');
   document.getElementById('checkContent').innerHTML = checkData[typeName].map(c=>`<li>${c}</li>`).join('');
   document.getElementById('restContent').innerHTML = rest.map((it,i)=>itemHTML(it, false, i)).join('');
@@ -2929,13 +2965,13 @@ function unlockInsight(btn){
   }
 }
 
+/* 카드는 "고를 때 필요한 것"만 겉으로 보여주고(제목·설명·스펙·선택버튼),
+   "고른 다음에 필요한 것"(단계·팁·인사이트·연령가이드·비용/링크)은 접어둠.
+   예산·시간 개인화 문구는 카드마다 똑같이 반복되던 거라 여기서 빼고 화면 상단에 1회만 노출함. */
 function itemHTML(it, selectable, idx, dynCtx){
   const steps = it.steps.map((s,i)=>`<li data-n="${i+1}.">${s}</li>`).join('');
   const meta = it.meta.map(m=>`<span>${m}</span>`).join('');
   const selectBtn = selectable ? `<button class="pick-btn" onclick="pickJob(${idx})">이걸로 시작할래 →</button>` : '';
-  // 선택 가능한(잠금 안 걸린) 3개 카드에만: 예산·시간·직업군 조합으로 만든 개인화 한 줄
-  const dynText = (selectable && dynCtx) ? dynamicNote(it, dynCtx.jobCat, dynCtx.budgetIdx, dynCtx.timePref) : '';
-  const dynHTML = dynText ? `<div class="dyn-note">🎯 ${dynText}</div>` : '';
   const ageHTML = (selectable && dynCtx && ageGuideSnippets[dynCtx.typeName]) ? ageGuideHTML(dynCtx.typeName, dynCtx.ageIdx) : '';
   const insight = blueOceanNotes[it.title];
   const insightHTML = insight ? `<div class="insight-box ${insight.type==='trend'?'insight-trend':''}">
@@ -2943,20 +2979,24 @@ function itemHTML(it, selectable, idx, dynCtx){
     <p>${insight.text}</p>
     ${insight.extended ? `<div class="insight-extended hidden">🔓 ${insight.extended}</div><button class="unlock-insight-btn" onclick="event.stopPropagation(); unlockInsight(this)">🔒 더 보기 — 공유하면 바로 열려</button>` : ''}
   </div>` : '';
+  // details 안을 탭했을 때 카드 전체 탭(=바로 선택)이 같이 발동하지 않도록 클릭 전파를 막음
+  const detailsHTML = `<details class="item-details" onclick="event.stopPropagation()">
+    <summary class="item-details-toggle">어떻게 시작하는지 자세히 보기</summary>
+    ${ageHTML}
+    <ol class="step-list">${steps}</ol>
+    <div class="item-tip">${it.tip}</div>
+    ${insightHTML}
+    ${costNoteHTML(it.title)}
+    ${linkButtonsFor(it)}
+  </details>`;
   // "다른 부업들"(선택 불가 목록)은 버튼 없이 카드 전체를 탭하면 바로 선택되게 — 버튼을 여러 개 달면 지저분해 보여서
   const tapAttr = (!selectable && idx!==undefined) ? ` onclick="pickRestJob(${idx})" role="button" tabindex="0"` : '';
   const tapHint = (!selectable && idx!==undefined) ? `<div class="tap-hint">→ 탭해서 이걸로 시작하기</div>` : '';
   return `<div class="item-block${selectable?' selectable':''}${!selectable?' tappable':''}" id="${selectable?('pickItem'+idx):''}"${tapAttr}>
     <div class="item-head"><span class="item-badge ${it.cls}">${it.badge}</span><span class="item-title">${it.title}</span></div>
     <div class="item-body">${it.body}</div>
-    ${dynHTML}
-    ${ageHTML}
-    <ol class="step-list">${steps}</ol>
-    <div class="item-tip">${it.tip}</div>
-    ${insightHTML}
     <div class="item-meta">${meta}</div>
-    ${costNoteHTML(it.title)}
-    ${linkButtonsFor(it)}
+    ${detailsHTML}
     ${selectBtn}
     ${tapHint}
   </div>`;
