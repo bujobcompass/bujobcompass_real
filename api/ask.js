@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6', // 품질·비용 균형이 좋은 기본 모델. 필요하면 나중에 다른 모델로 교체 가능
+        model: 'claude-sonnet-5', // 품질·비용 균형이 좋은 기본 모델. 필요하면 나중에 다른 모델로 교체 가능
         max_tokens: Math.min(maxTokens || 1000, 4000), // 응답 길이 상한 — 비용 통제용
         messages: [{ role: 'user', content: prompt }],
       }),
