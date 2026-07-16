@@ -37,3 +37,31 @@ self.addEventListener('fetch', (event) => {
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
   );
 });
+
+/* 매일 아침 8시(KST) 서버(/api/send-daily)가 보내는 푸시를 실제 알림으로 표시.
+   payload는 /api/send-daily.js에서 { title, body, url } 형태의 JSON으로 보냄. */
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { /* 무시 */ }
+  const title = data.title || '부업 나침반';
+  const options = {
+    body: data.body || '오늘의 챌린지를 확인해보세요',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    data: { url: data.url || './index.html' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// 알림을 탭하면 이미 열려있는 탭이 있으면 포커스, 없으면 새로 열기
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || './index.html';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      const existing = list.find((c) => c.url.includes('index.html') && 'focus' in c);
+      if (existing) return existing.focus();
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    })
+  );
+});

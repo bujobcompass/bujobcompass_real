@@ -782,6 +782,15 @@ function trackEvent(name, params){
   <section class="step" id="step-week1">
     <button class="btn-back" onclick="goStep('jobs')">← 부업 다시 고르기</button>
 
+    <!-- 매일 아침 8시 알림 구독 배너 -->
+    <div class="install-banner hidden" id="pushBanner">
+      <p>🔔 아침 8시에 오늘의 챌린지 알림 받을래?</p>
+      <div class="install-btns">
+        <button class="install-go" onclick="subscribeToPush()">알림 받기</button>
+        <button class="install-dismiss" onclick="dismissPushBanner()">나중에</button>
+      </div>
+    </div>
+
     <!-- 1주차 (하루씩 열림) -->
     <div class="week1-preview" id="week1Preview">
       <div class="week1-header">
@@ -2070,6 +2079,7 @@ function submitEmail(){
   saveProgress(); // 1주차 시작 시점부터 저장 — 다음 날 이어서 올 수 있게
   goStep('week1'); // 1주차는 별도 페이지에서 보여줌 (부업 선택 페이지와 분리)
   showToast('1주차 시작! Day 1부터 하루씩 열려 ✉️');
+  maybeShowPushBanner();
 }
 
 /* ============ 법적 고지 페이지 (개인정보처리방침 / 환불정책)
@@ -3371,6 +3381,58 @@ function doInstallPwa(){
 }
 function dismissInstallBanner(){
   document.getElementById('installBanner')?.classList.add('hidden');
+}
+
+/* ============ 매일 아침 8시 푸시 알림 구독
+   ⚠️ 세인님이 해야 할 것: VAPID_PUBLIC_KEY를 아래 PUSH_PUBLIC_KEY에 붙여넣기(발급 방법은 별도 안내 참고).
+   구독 정보는 /api/subscribe로 전송되어 서버(Upstash Redis)에 저장되고,
+   /api/send-daily가 매일 8시(KST)에 Vercel Cron으로 실행되며 모든 구독자에게 동일한 알림을 보냄. */
+const PUSH_PUBLIC_KEY = 'BH3ui6CSGaYI06aoDevERj1WcfSRYecZtwXnCPYD87J0H34MansHkqqlf4oydwICLXd-CFX-7_89qtYLqjVV1Lo';
+const PUSH_DISMISS_KEY = 'bujob_push_dismissed_v1';
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function maybeShowPushBanner(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return; // 미지원 브라우저(iOS 사파리 구버전 등)
+  if(localStorage.getItem(PUSH_DISMISS_KEY)) return; // 이미 구독했거나 "나중에" 누른 적 있으면 다시 안 띄움
+  if(Notification.permission === 'denied') return;
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    if(existing) return; // 이미 구독 중
+  }catch(e){ /* 무시 */ }
+  document.getElementById('pushBanner')?.classList.remove('hidden');
+}
+
+function dismissPushBanner(){
+  document.getElementById('pushBanner')?.classList.add('hidden');
+  try{ localStorage.setItem(PUSH_DISMISS_KEY, '1'); }catch(e){}
+}
+
+async function subscribeToPush(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(PUSH_PUBLIC_KEY),
+    });
+    const res = await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(sub),
+    });
+    if(!res.ok) throw new Error('구독 저장 실패');
+    dismissPushBanner();
+    showToast('알림 받기 완료! 아침 8시에 알려줄게 🔔');
+  }catch(err){
+    console.error('푸시 구독 실패:', err);
+    showToast('알림 설정에 실패했어 — 브라우저 알림 권한을 확인해줘');
+  }
 }
 
 /* 페이지 로드 시 링크 결과 있으면 복원 */
