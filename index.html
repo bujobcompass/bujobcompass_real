@@ -121,12 +121,13 @@
   .dyn-note-shared{font-size:12.5px; line-height:1.65; color:var(--brass-soft); background:rgba(204,154,92,0.07); border:1px solid rgba(204,154,92,0.2); border-radius:9px; padding:10px 12px; margin:10px 0 0;}
   .dyn-note-shared.hidden{display:none;}
   /* 카드 상세(단계·팁·인사이트 등)는 접어두고, 고를 때 필요한 것만 노출 */
-  .item-details{margin-top:4px;}
-  .item-details[open] .item-details-toggle{color:var(--brass-soft);}
-  .item-details-toggle{list-style:none; cursor:pointer; font-size:12.5px; color:var(--ink-dim); padding:9px 0; user-select:none;}
+  .item-details{margin-top:6px;}
+  .item-details[open] .item-details-toggle{color:var(--brass-soft); border-color:var(--brass);}
+  .item-details-toggle{list-style:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--brass-soft); padding:10px 14px; user-select:none; background:rgba(204,154,92,0.08); border:1px solid rgba(204,154,92,0.3); border-radius:9px; text-align:center;}
   .item-details-toggle::-webkit-details-marker{display:none;}
-  .item-details-toggle::after{content:' ▾'; font-size:10px;}
+  .item-details-toggle::after{content:' ▾'; font-size:11px;}
   .item-details[open] .item-details-toggle::after{content:' ▴';}
+  .item-details-toggle:active{transform:scale(0.98);}
 
   /* 나이대별 실행 가이드 (콘텐츠형·창작형) */
   .age-guide-box{background:rgba(143,174,156,0.08); border-radius:8px; padding:9px 11px; margin:8px 0;}
@@ -2108,7 +2109,19 @@ function submitEmail(){
   if(!consent){ showToast('수신 동의를 체크해줘'); return; }
 
   // TODO(배포후): 여기서 email을 수집 서비스(구글폼/Formspree/Stibee 등)로 전송
-  console.log('수집:', email, '| 유형:', lastResult&&lastResult.typeName, '| 관심사:', pickedInterest);
+  // → 완료: Upstash Redis에 저장하도록 연동됨
+  const emailData = {
+    email,
+    typeName: lastResult ? lastResult.typeName : '',
+    interest: pickedInterest || '',
+    job: jobText || '',
+    ts: new Date().toISOString()
+  };
+  fetch('/api/collect-email', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(emailData),
+  }).catch(err => console.error('이메일 수집 실패:', err));
   trackEvent('week1_email_submitted', { type_name: lastResult ? lastResult.typeName : '' });
 
   renderWeek1();
