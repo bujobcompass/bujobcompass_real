@@ -3301,7 +3301,7 @@ function restoreFromLink(){
     renderRestored(typeName, data, ti);
     // 결제 확인 후 세인님이 링크 뒤에 &u=1 을 붙여 회신하면, 여기서 2~4주차를 바로 열어줌 (백엔드 없이)
     const kIdx = p.get('k'); if(kIdx!==null) pickedJobIdx = parseInt(kIdx);
-    if(p.get('u')==='1'){ showUnlockedPaidContent(); }
+    if(p.get('u')==='1'){ goStep('week1'); showUnlockedPaidContent(); }
     return true;
   }catch(e){ return false; }
 }
